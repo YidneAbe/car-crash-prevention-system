@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Car Collision Avoidance Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            margin: 0;
+            padding: 20px;
+        }
+        #road {
+            width: 800px;
+            height: 200px;
+            background-color: #555;
+            margin: 40px auto;
+            position: relative;
+            border-left: 20px solid #8B4513;
+            border-right: 20px solid #8B4513;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .road-line {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            height: 0;
+            border-top: 5px dashed yellow;
+        }
+        .car {
+            width: 120px;
+            height: 60px;
+            position: absolute;
+            top: 70px;
+            transition: transform 0.1s;
+        }
+        #car1 {
+            left: 50px;
+            transform: rotateY(0deg);
+        }
+        #car2 {
+            right: 50px;
+            transform: rotateY(180deg);
+        }
+        .car-body {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            border-radius: 10px 20px 20px 10px;
+        }
+        .car-top {
+            position: absolute;
+            width: 60%;
+            height: 50%;
+            top: 0;
+            background-color: inherit;
+            border-radius: 10px 15px 0 0;
+        }
+        .wheel {
+            position: absolute;
+            width: 20px;
+            height: 30px;
+            background-color: #333;
+            border-radius: 5px;
+            bottom: -10px;
+        }
+        .wheel-front {
+            right: 15px;
+        }
+        .wheel-back {
+            left: 15px;
+        }
+        #car1 .car-body {
+            background-color: #FF4136;
+        }
+        #car2 .car-body {
+            background-color: #0074D9;
+        }
+        #controls, #infoPanel {
+            margin: 20px auto;
+            padding: 15px;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            width: 600px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #alertBox {
+            padding: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+            background-color: darkred;
+            margin: 10px auto;
+            width: 600px;
+            border-radius: 10px;
+            display: none;
+            animation: pulse 1s infinite;
+        }
+        #warningBox {
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: black;
+            background-color: orange;
+            margin: 10px auto;
+            width: 600px;
+            border-radius: 10px;
+            display: none;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input[type="number"] {
+            padding: 8px;
+            margin: 5px;
+            width: 60px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .distance-indicator {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-weight: bold;
+            background-color: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #audioStatus {
+            background-color: #ffeb3b;
+            padding: 10px;
+            margin: 10px auto;
+            width: 600px;
+            border-radius: 5px;
+            border: 2px solid #ffc107;
+        }
+        .audio-test {
+            margin: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>3D Car Collision Avoidance Simulator</h1>
+    <p>Simulates a head-on collision scenario with 3D car models</p>
+
+    <div id="audioStatus">
+        <h3>Audio Setup</h3>
+        <p>For the best experience, please enable audio:</p>
+        <div class="audio-test">
+            <p><strong>Test Audio:</strong> Click to check if sounds work</p>
+            <button onclick="testAudio()">Test Warning Sound</button>
+            <button onclick="testAlertSound()">Test Alert Sound</button>
+        </div>
+        <p id="audioResult" style="font-weight: bold; margin: 10px 0;"></p>
+    </div>
+
+    <div id="road">
+        <div class="road-line"></div>
+        <div class="distance-indicator">Distance: <span id="currentDistance">500</span>m</div>
+        
+        <div id="car1" class="car">
+            <div class="car-body">
+                <div class="car-top"></div>
+                <div class="wheel wheel-front"></div>
+                <div class="wheel wheel-back"></div>
+            </div>
+        </div>
+        
+        <div id="car2" class="car">
+            <div class="car-body">
+                <div class="car-top"></div>
+                <div class="wheel wheel-front"></div>
+                <div class="wheel wheel-back"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="warningBox"></div>
+    <div id="alertBox"></div>
+
+    <div id="infoPanel">
+        <h3>Simulation Data</h3>
+        <p>Initial Distance: <span id="distance">500</span> meters</p>
+        <p>Car A Speed: <span id="speedA">20</span> m/s</p>
+        <p>Car B Speed: <span id="speedB">25</span> m/s</p>
+        <p>Time to Collision: <span id="ttc">--</span> seconds</p>
+        <p>System Status: <span id="status">MONITORING...</span></p>
+    </div>
+
+    <div id="controls">
+        <button onclick="startSimulation()">Start Simulation</button>
+        <button onclick="resetSimulation()">Reset Simulation</button>
+        <br><br>
+        <label for="speedAInput">Car A Speed (m/s): </label>
+        <input type="number" id="speedAInput" value="20" min="1" max="50">
+        <label for="speedBInput">Car B Speed (m/s): </label>
+        <input type="number" id="speedBInput" value="25" min="1" max="50">
+    </div>
+
+    <!-- Hidden audio elements -->
+    <audio id="beep1" preload="auto">
+        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav">
+    </audio>
+    <audio id="beep2" preload="auto">
+        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav">
+    </audio>
+
+    <script>
+        // Get DOM elements
+        const car1 = document.getElementById('car1');
+        const car2 = document.getElementById('car2');
+        const alertBox = document.getElementById('alertBox');
+        const warningBox = document.getElementById('warningBox');
+        const distanceSpan = document.getElementById('distance');
+        const currentDistanceSpan = document.getElementById('currentDistance');
+        const speedASpan = document.getElementById('speedA');
+        const speedBSpan = document.getElementById('speedB');
+        const ttcSpan = document.getElementById('ttc');
+        const statusSpan = document.getElementById('status');
+        const speedAInput = document.getElementById('speedAInput');
+        const speedBInput = document.getElementById('speedBInput');
+        const audioResult = document.getElementById('audioResult');
+
+        // Audio elements
+        const beep1 = document.getElementById('beep1');
+        const beep2 = document.getElementById('beep2');
+
+        // Audio context and flags
+        let audioContext;
+        let audioEnabled = false;
+        let warningSoundPlayed = false;
+        let alertSoundPlayed = false;
+
+        // Test audio functions
+        function testAudio() {
+            playWarningSound();
+            audioResult.textContent = "You should hear a warning sound. If not, check your browser volume.";
+            audioResult.style.color = "green";
+        }
+
+        function testAlertSound() {
+            playAlertSound();
+            audioResult.textContent = "You should hear an alert sound. If not, check your browser volume.";
+            audioResult.style.color = "green";
+        }
+
+        // Initialize audio context
+        function initAudio() {
+            if (!audioContext) {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log("Audio context created");
+                } catch (e) {
+                    console.error("Web Audio API not supported:", e);
+                }
+            }
+            
+            // Try to resume audio context (required for some browsers)
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                    console.log("Audio context resumed");
+                    audioEnabled = true;
+                });
+            } else {
+                audioEnabled = true;
+            }
+        }
+
+        // Function to play warning sound (at 200 meters)
+        function playWarningSound() {
+            // Method 1: Try Web Audio API first
+            if (audioContext && audioEnabled) {
+                try {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Single beep for warning
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                    
+                    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                    console.log("Warning sound played via Web Audio API");
+                    return;
+                } catch (e) {
+                    console.error("Web Audio API failed:", e);
+                }
+            }
+            
+            // Method 2: Try HTML5 Audio fallback
+            try {
+                beep1.currentTime = 0;
+                beep1.volume = 0.5;
+                
+                // Create a beep using the audio element (base64 encoded silent audio with our beep)
+                // This is a workaround - we'll use the existing silent audio and try to play it
+                const playPromise = beep1.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log("Warning sound played via HTML5 Audio");
+                    }).catch(e => {
+                        console.error("HTML5 Audio play failed:", e);
+                        // Method 3: Use browser beep as last resort
+                        useBrowserBeep(600, 500);
+                    });
+                }
+            } catch (e) {
+                console.error("HTML5 Audio failed:", e);
+                // Method 3: Use browser beep as last resort
+                useBrowserBeep(600, 500);
+            }
+        }
+
+        // Function to play alert sound (at 100 meters)
+        function playAlertSound() {
+            // Method 1: Try Web Audio API first
+            if (audioContext && audioEnabled) {
+                try {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Urgent beeping pattern for alert
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.3);
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.4);
+                    
+                    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                    console.log("Alert sound played via Web Audio API");
+                    return;
+                } catch (e) {
+                    console.error("Web Audio API failed:", e);
+                }
+            }
+            
+            // Method 2: Try HTML5 Audio fallback with multiple plays for the pattern
+            try {
+                beep2.currentTime = 0;
+                beep2.volume = 0.5;
+                
+                const playPromise = beep2.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log("Alert sound played via HTML5 Audio");
+                        // Try to create a pattern by playing multiple times
+                        setTimeout(() => {
+                            beep2.currentTime = 0;
+                            beep2.play();
+                        }, 200);
+                        setTimeout(() => {
+                            beep2.currentTime = 0;
+                            beep2.play();
+                        }, 400);
+                    }).catch(e => {
+                        console.error("HTML5 Audio play failed:", e);
+                        // Method 3: Use browser beep as last resort
+                        useBrowserBeep(800, 100);
+                        setTimeout(() => useBrowserBeep(600, 100), 100);
+                        setTimeout(() => useBrowserBeep(800, 100), 200);
+                    });
+                }
+            } catch (e) {
+                console.error("HTML5 Audio failed:", e);
+                // Method 3: Use browser beep as last resort
+                useBrowserBeep(800, 100);
+                setTimeout(() => useBrowserBeep(600, 100), 100);
+                setTimeout(() => useBrowserBeep(800, 100), 200);
+            }
+        }
+
+        // Fallback method using browser's built-in beep (works in some browsers)
+        function useBrowserBeep(frequency, duration) {
+            // This method doesn't actually control frequency/duration in most browsers
+            // but it's a last resort attempt to make any sound
+            try {
+                // Method 1: Using console beep (works in some terminals/browsers)
+                console.log('\x07');
+                
+                // Method 2: Using speech synthesis to play a tone
+                if (window.speechSynthesis) {
+                    const utterance = new SpeechSynthesisUtterance();
+                    utterance.text = " ";
+                    utterance.volume = 0.1;
+                    window.speechSynthesis.speak(utterance);
+                }
+                
+                console.log("Used browser fallback beep");
+            } catch (e) {
+                console.error("Browser beep failed:", e);
+            }
+        }
+
+        // Road is 800px wide, and we want to simulate 500 meters
+        const roadWidth = 800;
+        const initialDistance = 500; // meters
+        const pixelsPerMeter = roadWidth / initialDistance;
+        let animationId;
+        let currentDistance = initialDistance;
+
+        function startSimulation() {
+            // Initialize audio on first simulation start
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            resetSimulation();
+            const speedA = parseInt(speedAInput.value);
+            const speedB = parseInt(speedBInput.value);
+
+            speedASpan.textContent = speedA;
+            speedBSpan.textContent = speedB;
+
+            statusSpan.textContent = "SIMULATION RUNNING...";
+            statusSpan.style.color = "orange";
+
+            // Reset sound flags
+            warningSoundPlayed = false;
+            alertSoundPlayed = false;
+
+            // Calculate relative speed
+            const relativeSpeed = speedA + speedB;
+
+            let startTime = null;
+            let car1Position = 50; // Starting position of car1 in pixels
+            let car2Position = roadWidth - 170; // Starting position of car2 in pixels (roadWidth - carWidth - initial offset)
+
+            function animate(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsedTime = (timestamp - startTime) / 1000;
+
+                // Update the distance based on time and relative speed
+                currentDistance = initialDistance - (elapsedTime * relativeSpeed);
+                currentDistance = Math.max(0, currentDistance);
+
+                // Update car positions
+                car1Position = 50 + (elapsedTime * speedA * pixelsPerMeter);
+                car2Position = (roadWidth - 170) - (elapsedTime * speedB * pixelsPerMeter);
+                
+                car1.style.left = car1Position + 'px';
+                car2.style.right = (roadWidth - car2Position - 120) + 'px';
+
+                // Add slight bounce effect to simulate movement
+                const bounce = Math.sin(elapsedTime * 10) * 2;
+                car1.style.transform = `rotateY(0deg) translateY(${bounce}px)`;
+                car2.style.transform = `rotateY(180deg) translateY(${bounce}px)`;
+
+                // Update the info panel
+                distanceSpan.textContent = currentDistance.toFixed(1);
+                currentDistanceSpan.textContent = currentDistance.toFixed(0);
+                const timeToCollision = currentDistance / relativeSpeed;
+                ttcSpan.textContent = timeToCollision.toFixed(1);
+
+                // Check conditions
+                if (currentDistance <= 0 || car1Position + 120 >= car2Position) {
+                    statusSpan.textContent = "COLLISION OCCURRED!";
+                    statusSpan.style.color = "red";
+                    alertBox.textContent = "CRASH! System failed to avoid collision.";
+                    alertBox.style.display = 'block';
+                    alertBox.style.backgroundColor = 'red';
+                    
+                    // Add collision effect
+                    car1.style.transform = 'rotateY(0deg) rotateZ(10deg)';
+                    car2.style.transform = 'rotateY(180deg) rotateZ(-10deg)';
+                    
+                    cancelAnimationFrame(animationId);
+                    return;
+                } else if (currentDistance <= 100 && currentDistance > 0 && !alertSoundPlayed) {
+                    // Trigger avoidance system when closer than or equal to 100 meters
+                    statusSpan.textContent = "AVOIDANCE SYSTEM ACTIVE!";
+                    statusSpan.style.color = "green";
+                    alertBox.style.display = 'block';
+                    alertBox.style.backgroundColor = 'darkred';
+
+                    // Play alert sound at 100 meters
+                    playAlertSound();
+                    alertSoundPlayed = true;
+
+                    // Simple logic: Advise the faster car to change direction
+                    if (speedA >= speedB) {
+                        alertBox.textContent = "ALERT: Car A (Red), you are faster! Change direction to the RIGHT immediately!";
+                    } else {
+                        alertBox.textContent = "ALERT: Car B (Blue), you are faster! Change direction to the LEFT immediately!";
+                    }
+                } else if (currentDistance <= 200 && currentDistance > 100 && !warningSoundPlayed) {
+                    // Trigger warning system when closer than or equal to 200 meters
+                    statusSpan.textContent = "WARNING: Vehicles Approaching!";
+                    statusSpan.style.color = "orange";
+                    warningBox.style.display = 'block';
+                    warningBox.textContent = "WARNING: Vehicles approaching head-on. Prepare for possible avoidance maneuver.";
+                    
+                    // Play warning sound at 200 meters
+                    playWarningSound();
+                    warningSoundPlayed = true;
+                }
+
+                // Continue the animation
+                animationId = requestAnimationFrame(animate);
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function resetSimulation() {
+            cancelAnimationFrame(animationId);
+            car1.style.left = '50px';
+            car2.style.right = '50px';
+            car1.style.transform = 'rotateY(0deg)';
+            car2.style.transform = 'rotateY(180deg)';
+            currentDistance = initialDistance;
+            distanceSpan.textContent = initialDistance;
+            currentDistanceSpan.textContent = initialDistance;
+            ttcSpan.textContent = '--';
+            statusSpan.textContent = 'MONITORING...';
+            statusSpan.style.color = 'black';
+            alertBox.style.display = 'none';
+            warningBox.style.display = 'none';
+            warningSoundPlayed = false;
+            alertSoundPlayed = false;
+        }
+
+        // Initialize audio when the page loads
+        window.addEventListener('load', function() {
+            // Preload audio elements
+            beep1.load();
+            beep2.load();
+            
+            // Try to initialize audio context
+            initAudio();
+        });
+    </script>
+</body>
+</html>
