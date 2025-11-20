@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Car Collision Avoidance Simulator</title>
+    <title>3D Car Collision Avoidance Simulator with Bluetooth</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -79,7 +79,7 @@
         #car2 .car-body {
             background-color: #0074D9;
         }
-        #controls, #infoPanel {
+        #controls, #infoPanel, #bluetoothPanel {
             margin: 20px auto;
             padding: 15px;
             border: 2px solid #ccc;
@@ -87,6 +87,45 @@
             width: 600px;
             background-color: white;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #bluetoothPanel {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .bluetooth-device {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 10px 0;
+            background: #f5f5f5;
+            border-radius: 5px;
+            border-left: 4px solid #2196f3;
+        }
+        .device-info {
+            text-align: left;
+        }
+        .device-status {
+            font-weight: bold;
+        }
+        .connected {
+            color: #4caf50;
+        }
+        .searching {
+            color: #ff9800;
+        }
+        .signal-strength {
+            display: flex;
+            align-items: center;
+        }
+        .signal-bar {
+            width: 5px;
+            height: 15px;
+            margin: 0 2px;
+            background: #ccc;
+        }
+        .signal-bar.active {
+            background: #4caf50;
         }
         #alertBox {
             padding: 20px;
@@ -111,6 +150,17 @@
             border-radius: 10px;
             display: none;
         }
+        #bluetoothAlert {
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+            background-color: #2196f3;
+            margin: 10px auto;
+            width: 600px;
+            border-radius: 10px;
+            display: none;
+        }
         button {
             padding: 10px 20px;
             font-size: 1em;
@@ -124,6 +174,12 @@
         }
         button:hover {
             background-color: #45a049;
+        }
+        button.bluetooth {
+            background-color: #2196f3;
+        }
+        button.bluetooth:hover {
+            background-color: #0b7dda;
         }
         input[type="number"] {
             padding: 8px;
@@ -166,8 +222,8 @@
 </head>
 <body>
 
-    <h1>3D Car Collision Avoidance Simulator</h1>
-    <p>Simulates a head-on collision scenario with 3D car models</p>
+    <h1>3D Car Collision Avoidance Simulator with Bluetooth</h1>
+    <p>Simulates a head-on collision scenario with Bluetooth device detection</p>
 
     <div id="audioStatus">
         <h3>Audio Setup</h3>
@@ -176,13 +232,50 @@
             <p><strong>Test Audio:</strong> Click to check if sounds work</p>
             <button onclick="testAudio()">Test Warning Sound</button>
             <button onclick="testAlertSound()">Test Alert Sound</button>
+            <button onclick="testBluetoothSound()">Test Bluetooth Sound</button>
         </div>
         <p id="audioResult" style="font-weight: bold; margin: 10px 0;"></p>
     </div>
 
+    <div id="bluetoothPanel">
+        <h3>Bluetooth Vehicle Detection System</h3>
+        <div class="bluetooth-device">
+            <div class="device-info">
+                <strong>Car A (Red)</strong><br>
+                Device ID: VHC-001-RED<br>
+                <span class="device-status connected">Connected</span>
+            </div>
+            <div class="signal-strength" id="signalA">
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+            </div>
+        </div>
+        <div class="bluetooth-device">
+            <div class="device-info">
+                <strong>Car B (Blue)</strong><br>
+                Device ID: VHC-002-BLU<br>
+                <span class="device-status connected">Connected</span>
+            </div>
+            <div class="signal-strength" id="signalB">
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+            </div>
+        </div>
+        <div id="bluetoothInfo">
+            <p>Bluetooth Range: 500 meters | Protocol: V2V-BT5.0</p>
+        </div>
+        <button class="bluetooth" onclick="scanBluetoothDevices()">Scan for Vehicles</button>
+    </div>
+
     <div id="road">
         <div class="road-line"></div>
-        <div class="distance-indicator">Distance: <span id="currentDistance">500</span>m</div>
+        <div class="distance-indicator">Distance: <span id="currentDistance">1000</span>m</div>
         
         <div id="car1" class="car">
             <div class="car-body">
@@ -201,15 +294,17 @@
         </div>
     </div>
 
+    <div id="bluetoothAlert"></div>
     <div id="warningBox"></div>
     <div id="alertBox"></div>
 
     <div id="infoPanel">
         <h3>Simulation Data</h3>
-        <p>Initial Distance: <span id="distance">500</span> meters</p>
+        <p>Initial Distance: <span id="distance">1000</span> meters</p>
         <p>Car A Speed: <span id="speedA">20</span> m/s</p>
         <p>Car B Speed: <span id="speedB">25</span> m/s</p>
         <p>Time to Collision: <span id="ttc">--</span> seconds</p>
+        <p>Bluetooth Distance: <span id="btDistance">--</span> meters</p>
         <p>System Status: <span id="status">MONITORING...</span></p>
     </div>
 
@@ -230,6 +325,9 @@
     <audio id="beep2" preload="auto">
         <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav">
     </audio>
+    <audio id="beep3" preload="auto">
+        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav">
+    </audio>
 
     <script>
         // Get DOM elements
@@ -237,8 +335,10 @@
         const car2 = document.getElementById('car2');
         const alertBox = document.getElementById('alertBox');
         const warningBox = document.getElementById('warningBox');
+        const bluetoothAlert = document.getElementById('bluetoothAlert');
         const distanceSpan = document.getElementById('distance');
         const currentDistanceSpan = document.getElementById('currentDistance');
+        const btDistanceSpan = document.getElementById('btDistance');
         const speedASpan = document.getElementById('speedA');
         const speedBSpan = document.getElementById('speedB');
         const ttcSpan = document.getElementById('ttc');
@@ -246,16 +346,21 @@
         const speedAInput = document.getElementById('speedAInput');
         const speedBInput = document.getElementById('speedBInput');
         const audioResult = document.getElementById('audioResult');
+        const signalA = document.getElementById('signalA');
+        const signalB = document.getElementById('signalB');
 
         // Audio elements
         const beep1 = document.getElementById('beep1');
         const beep2 = document.getElementById('beep2');
+        const beep3 = document.getElementById('beep3');
 
         // Audio context and flags
         let audioContext;
         let audioEnabled = false;
         let warningSoundPlayed = false;
         let alertSoundPlayed = false;
+        let bluetoothSoundPlayed = false;
+        let bluetoothConnected = false;
 
         // Test audio functions
         function testAudio() {
@@ -270,6 +375,12 @@
             audioResult.style.color = "green";
         }
 
+        function testBluetoothSound() {
+            playBluetoothSound();
+            audioResult.textContent = "You should hear a Bluetooth detection sound. If not, check your browser volume.";
+            audioResult.style.color = "green";
+        }
+
         // Initialize audio context
         function initAudio() {
             if (!audioContext) {
@@ -281,7 +392,6 @@
                 }
             }
             
-            // Try to resume audio context (required for some browsers)
             if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume().then(() => {
                     console.log("Audio context resumed");
@@ -294,7 +404,6 @@
 
         // Function to play warning sound (at 200 meters)
         function playWarningSound() {
-            // Method 1: Try Web Audio API first
             if (audioContext && audioEnabled) {
                 try {
                     const oscillator = audioContext.createOscillator();
@@ -303,7 +412,6 @@
                     oscillator.connect(gainNode);
                     gainNode.connect(audioContext.destination);
                     
-                    // Single beep for warning
                     oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
                     
                     gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
@@ -311,40 +419,23 @@
                     
                     oscillator.start(audioContext.currentTime);
                     oscillator.stop(audioContext.currentTime + 0.5);
-                    console.log("Warning sound played via Web Audio API");
                     return;
                 } catch (e) {
                     console.error("Web Audio API failed:", e);
                 }
             }
             
-            // Method 2: Try HTML5 Audio fallback
             try {
                 beep1.currentTime = 0;
                 beep1.volume = 0.5;
-                
-                // Create a beep using the audio element (base64 encoded silent audio with our beep)
-                // This is a workaround - we'll use the existing silent audio and try to play it
-                const playPromise = beep1.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        console.log("Warning sound played via HTML5 Audio");
-                    }).catch(e => {
-                        console.error("HTML5 Audio play failed:", e);
-                        // Method 3: Use browser beep as last resort
-                        useBrowserBeep(600, 500);
-                    });
-                }
+                beep1.play().catch(e => console.error("HTML5 Audio play failed:", e));
             } catch (e) {
                 console.error("HTML5 Audio failed:", e);
-                // Method 3: Use browser beep as last resort
-                useBrowserBeep(600, 500);
             }
         }
 
         // Function to play alert sound (at 100 meters)
         function playAlertSound() {
-            // Method 1: Try Web Audio API first
             if (audioContext && audioEnabled) {
                 try {
                     const oscillator = audioContext.createOscillator();
@@ -353,7 +444,6 @@
                     oscillator.connect(gainNode);
                     gainNode.connect(audioContext.destination);
                     
-                    // Urgent beeping pattern for alert
                     oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
                     oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
                     oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
@@ -365,79 +455,103 @@
                     
                     oscillator.start(audioContext.currentTime);
                     oscillator.stop(audioContext.currentTime + 0.5);
-                    console.log("Alert sound played via Web Audio API");
                     return;
                 } catch (e) {
                     console.error("Web Audio API failed:", e);
                 }
             }
             
-            // Method 2: Try HTML5 Audio fallback with multiple plays for the pattern
             try {
                 beep2.currentTime = 0;
                 beep2.volume = 0.5;
-                
-                const playPromise = beep2.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        console.log("Alert sound played via HTML5 Audio");
-                        // Try to create a pattern by playing multiple times
-                        setTimeout(() => {
-                            beep2.currentTime = 0;
-                            beep2.play();
-                        }, 200);
-                        setTimeout(() => {
-                            beep2.currentTime = 0;
-                            beep2.play();
-                        }, 400);
-                    }).catch(e => {
-                        console.error("HTML5 Audio play failed:", e);
-                        // Method 3: Use browser beep as last resort
-                        useBrowserBeep(800, 100);
-                        setTimeout(() => useBrowserBeep(600, 100), 100);
-                        setTimeout(() => useBrowserBeep(800, 100), 200);
-                    });
-                }
+                beep2.play().catch(e => console.error("HTML5 Audio play failed:", e));
             } catch (e) {
                 console.error("HTML5 Audio failed:", e);
-                // Method 3: Use browser beep as last resort
-                useBrowserBeep(800, 100);
-                setTimeout(() => useBrowserBeep(600, 100), 100);
-                setTimeout(() => useBrowserBeep(800, 100), 200);
             }
         }
 
-        // Fallback method using browser's built-in beep (works in some browsers)
-        function useBrowserBeep(frequency, duration) {
-            // This method doesn't actually control frequency/duration in most browsers
-            // but it's a last resort attempt to make any sound
-            try {
-                // Method 1: Using console beep (works in some terminals/browsers)
-                console.log('\x07');
-                
-                // Method 2: Using speech synthesis to play a tone
-                if (window.speechSynthesis) {
-                    const utterance = new SpeechSynthesisUtterance();
-                    utterance.text = " ";
-                    utterance.volume = 0.1;
-                    window.speechSynthesis.speak(utterance);
+        // Function to play Bluetooth detection sound (at 500 meters)
+        function playBluetoothSound() {
+            if (audioContext && audioEnabled) {
+                try {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Different sound for Bluetooth detection
+                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(500, audioContext.currentTime + 0.1);
+                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.2);
+                    
+                    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                    return;
+                } catch (e) {
+                    console.error("Web Audio API failed:", e);
                 }
-                
-                console.log("Used browser fallback beep");
+            }
+            
+            try {
+                beep3.currentTime = 0;
+                beep3.volume = 0.4;
+                beep3.play().catch(e => console.error("HTML5 Audio play failed:", e));
             } catch (e) {
-                console.error("Browser beep failed:", e);
+                console.error("HTML5 Audio failed:", e);
             }
         }
 
-        // Road is 800px wide, and we want to simulate 500 meters
+        // Simulate Bluetooth device scanning
+        function scanBluetoothDevices() {
+            statusSpan.textContent = "SCANNING FOR VEHICLES...";
+            statusSpan.style.color = "blue";
+            
+            // Simulate scanning delay
+            setTimeout(() => {
+                bluetoothConnected = true;
+                statusSpan.textContent = "BLUETOOTH CONNECTED - MONITORING...";
+                statusSpan.style.color = "green";
+                
+                // Update signal strength displays
+                updateBluetoothSignal(500);
+                
+                alert("Bluetooth devices connected successfully!\nVehicle A: VHC-001-RED\nVehicle B: VHC-002-BLU");
+            }, 1500);
+        }
+
+        // Update Bluetooth signal strength based on distance
+        function updateBluetoothSignal(distance) {
+            // Calculate signal strength (inverse relationship with distance)
+            let strength = Math.max(0, Math.min(5, Math.floor(5 - (distance / 100))));
+            
+            // Update signal bars for both devices
+            const barsA = signalA.querySelectorAll('.signal-bar');
+            const barsB = signalB.querySelectorAll('.signal-bar');
+            
+            barsA.forEach((bar, index) => {
+                bar.classList.toggle('active', index < strength);
+            });
+            
+            barsB.forEach((bar, index) => {
+                bar.classList.toggle('active', index < strength);
+            });
+            
+            // Update Bluetooth distance display
+            btDistanceSpan.textContent = distance.toFixed(0);
+        }
+
+        // Road is 800px wide, and we want to simulate 1000 meters
         const roadWidth = 800;
-        const initialDistance = 500; // meters
+        const initialDistance = 1000; // meters
         const pixelsPerMeter = roadWidth / initialDistance;
         let animationId;
         let currentDistance = initialDistance;
 
         function startSimulation() {
-            // Initialize audio on first simulation start
             if (!audioContext) {
                 initAudio();
             }
@@ -455,13 +569,14 @@
             // Reset sound flags
             warningSoundPlayed = false;
             alertSoundPlayed = false;
+            bluetoothSoundPlayed = false;
 
             // Calculate relative speed
             const relativeSpeed = speedA + speedB;
 
             let startTime = null;
-            let car1Position = 50; // Starting position of car1 in pixels
-            let car2Position = roadWidth - 170; // Starting position of car2 in pixels (roadWidth - carWidth - initial offset)
+            let car1Position = 50;
+            let car2Position = roadWidth - 170;
 
             function animate(timestamp) {
                 if (!startTime) startTime = timestamp;
@@ -488,6 +603,11 @@
                 currentDistanceSpan.textContent = currentDistance.toFixed(0);
                 const timeToCollision = currentDistance / relativeSpeed;
                 ttcSpan.textContent = timeToCollision.toFixed(1);
+
+                // Update Bluetooth signal strength if connected
+                if (bluetoothConnected) {
+                    updateBluetoothSignal(currentDistance);
+                }
 
                 // Check conditions
                 if (currentDistance <= 0 || car1Position + 120 >= car2Position) {
@@ -530,6 +650,16 @@
                     // Play warning sound at 200 meters
                     playWarningSound();
                     warningSoundPlayed = true;
+                } else if (currentDistance <= 500 && currentDistance > 200 && bluetoothConnected && !bluetoothSoundPlayed) {
+                    // Trigger Bluetooth detection when closer than or equal to 500 meters
+                    statusSpan.textContent = "BLUETOOTH VEHICLE DETECTED!";
+                    statusSpan.style.color = "blue";
+                    bluetoothAlert.style.display = 'block';
+                    bluetoothAlert.textContent = "BLUETOOTH ALERT: Vehicle detected within 500 meters. Maintain safe distance.";
+                    
+                    // Play Bluetooth detection sound at 500 meters
+                    playBluetoothSound();
+                    bluetoothSoundPlayed = true;
                 }
 
                 // Continue the animation
@@ -548,23 +678,30 @@
             currentDistance = initialDistance;
             distanceSpan.textContent = initialDistance;
             currentDistanceSpan.textContent = initialDistance;
+            btDistanceSpan.textContent = '--';
             ttcSpan.textContent = '--';
             statusSpan.textContent = 'MONITORING...';
             statusSpan.style.color = 'black';
             alertBox.style.display = 'none';
             warningBox.style.display = 'none';
+            bluetoothAlert.style.display = 'none';
             warningSoundPlayed = false;
             alertSoundPlayed = false;
+            bluetoothSoundPlayed = false;
+            
+            // Reset Bluetooth signal
+            updateBluetoothSignal(initialDistance);
         }
 
         // Initialize audio when the page loads
         window.addEventListener('load', function() {
-            // Preload audio elements
             beep1.load();
             beep2.load();
-            
-            // Try to initialize audio context
+            beep3.load();
             initAudio();
+            
+            // Initialize Bluetooth signal display
+            updateBluetoothSignal(initialDistance);
         });
     </script>
 </body>
